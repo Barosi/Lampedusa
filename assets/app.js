@@ -59,6 +59,7 @@ function saveState() {
   } else {
     window.__memState = state;
   }
+  Sync.push(); // se la sincronizzazione è attiva, invia anche al cloud (debounced)
 }
 
 /* IndexedDB per i PDF (blob), con fallback in memoria */
@@ -650,11 +651,88 @@ function openSidebar() { document.getElementById("sidebar").classList.add("open"
 function closeSidebar() { document.getElementById("sidebar").classList.remove("open"); document.getElementById("scrim").classList.remove("show"); }
 
 function updateStorageNote() {
-  const dot = document.querySelector("#storageNote .storage-dot");
+  const dot = document.getElementById("storageDot");
   const txt = document.getElementById("storageText");
-  if (STORAGE_OK) { dot.classList.remove("mem"); txt.textContent = "Dati salvati in questo browser"; }
-  else { dot.classList.add("mem"); txt.textContent = "Anteprima: dati solo in memoria"; }
+  if (!dot || !txt) return;
+  if (STORAGE_OK) { dot.classList.remove("mem"); txt.textContent = "Dati salvati su questo dispositivo"; }
+  else { dot.classList.add("mem"); txt.textContent = "Sessione: dati solo in memoria"; }
 }
+
+/* Indicatore stato sincronizzazione cloud */
+function updateSyncBadge(status) {
+  const dot = document.getElementById("syncDot");
+  const txt = document.getElementById("syncText");
+  if (!dot || !txt) return;
+  const map = {
+    ok:   ["#1e9e6a", "Sincronizzato in cloud"],
+    wait: ["#16b1ac", "Connessione al cloud…"],
+    off:  ["#7d949b", "Solo questo dispositivo"],
+    err:  ["#e8a33d", "Sync non disponibile"],
+  };
+  const [c, t] = map[status] || map.off;
+  dot.style.background = c; txt.textContent = t;
+}
+
+/* ============================================================
+   Sincronizzazione cloud (Firebase Firestore) — opzionale.
+   Attiva solo se window.FIREBASE_CONFIG è valorizzato in firebase-config.js.
+   Modello: un singolo documento condiviso (per TRIP_ID) con tutto lo stato,
+   tranne i PDF che restano locali. Aggiornamenti in tempo reale (onSnapshot),
+   ultimo-che-scrive-vince. I PDF non vengono sincronizzati.
+   ============================================================ */
+const Sync = {
+  active: false, ref: null, lastRev: null, applying: false, timer: null,
+
+  async init() {
+    const cfg = window.FIREBASE_CONFIG;
+    const configurato = cfg && cfg.apiKey && cfg.apiKey !== "INCOLLA_QUI" && typeof firebase !== "undefined";
+    if (!configurato) { updateSyncBadge("off"); return false; }
+    updateSyncBadge("wait");
+    try {
+      if (!firebase.apps.length) firebase.initializeApp(cfg);
+      await firebase.auth().signInAnonymously();
+      this.ref = firebase.firestore().collection("trips").doc(window.TRIP_ID || "default");
+      this.active = true;
+      this.ref.onSnapshot(
+        (snap) => this.onRemote(snap),
+        (err) => { console.warn("Sync error:", err.message); updateSyncBadge("err"); }
+      );
+      return true;
+    } catch (e) {
+      console.warn("Sync disattivato:", e.message);
+      updateSyncBadge("err");
+      return false;
+    }
+  },
+
+  onRemote(snap) {
+    if (!snap.exists) { this.push(true); return; }       // primo avvio: creo il doc dallo stato locale
+    const data = snap.data();
+    if (data._rev && data._rev === this.lastRev) return; // è l'eco del mio stesso salvataggio
+    const localDocs = state.documenti;                    // i PDF restano locali, non li tocco
+    state = Object.assign(defaultState(), data.state || {});
+    state.documenti = localDocs;
+    this.applying = true;
+    buildNav();
+    // non re-renderizzo se c'è una modale aperta (per non interrompere una modifica)
+    if (!document.getElementById("modalBg").classList.contains("show")) go(current);
+    this.applying = false;
+    updateSyncBadge("ok");
+  },
+
+  push(force) {
+    if (!this.active || this.applying || !this.ref) return;
+    clearTimeout(this.timer);
+    this.timer = setTimeout(() => {
+      this.lastRev = uid();
+      const c = JSON.parse(JSON.stringify(state));
+      delete c.documenti; // i PDF non vanno in cloud
+      this.ref.set({ state: c, _rev: this.lastRev, _updated: Date.now() })
+        .then(() => updateSyncBadge("ok"))
+        .catch((e) => { console.warn("Push error:", e.message); updateSyncBadge("err"); });
+    }, force ? 0 : 450);
+  },
+};
 
 /* ============================================================
    Event delegation
@@ -724,15 +802,16 @@ document.addEventListener("drop", (e) => { const dz = e.target.closest("#dropzon
 /* ============================================================
    Avvio
    ============================================================ */
-
-   (function init() {
-     updateStorageNote();
-     buildNav();
-     go("panoramica");
-     // IndexedDB aperto in background: se non risponde entro 3s, si prosegue
-     // comunque (i PDF useranno il fallback in memoria per la sessione).
-     Promise.race([
-       IDB.open(),
-       new Promise((r) => setTimeout(() => r(false), 3000)),
-     ]).then(updateStorageNote).catch(() => {});
-   })();
+(function init() {
+  // 1) disegno subito l'interfaccia (non aspetto storage/cloud)
+  updateStorageNote();
+  buildNav();
+  go("panoramica");
+  // 2) apro IndexedDB in background: se non risponde entro 3s, proseguo comunque
+  Promise.race([
+    IDB.open(),
+    new Promise((r) => setTimeout(() => r(false), 3000)),
+  ]).then(updateStorageNote).catch(() => {});
+  // 3) attivo la sincronizzazione cloud se configurata
+  Sync.init();
+})();

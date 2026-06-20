@@ -33,7 +33,8 @@
       <nav class="nav" id="nav"><!-- popolata da app.js --></nav>
 
       <div class="side-foot" id="storageNote">
-        <span class="storage-dot"></span><span id="storageText">Dati salvati in questo browser</span>
+        <div><span class="storage-dot" id="storageDot"></span><span id="storageText">Dati su questo dispositivo</span></div>
+        <div style="margin-top:7px"><span class="storage-dot" id="syncDot" style="background:#7d949b"></span><span id="syncText">Solo questo dispositivo</span></div>
       </div>
     </aside>
     <div class="scrim" id="scrim"></div>
@@ -69,6 +70,12 @@
 
   <div class="toast" id="toast"></div>
 
+  <!-- Sincronizzazione cloud (opzionale). Se firebase-config.js non è configurato,
+       l'app funziona comunque in locale su questo dispositivo. -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore-compat.js"></script>
+  <script src="firebase-config.js"></script>
   <script src="assets/app.js"></script>
 </body>
 </html>

@@ -1,0 +1,10 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Il planner di viaggio: lettura/scrittura solo a utenti autenticati
+    // (l'app usa l'autenticazione anonima di Firebase).
+    match /trips/{tripId} {
+      allow read, write: if request.auth != null;
+    }
+  }
+}
