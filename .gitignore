@@ -1,0 +1,12 @@
+# Sistema
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+*.swp
+
+# Log e dipendenze (non usate, ma per sicurezza)
+node_modules/
+*.log
