@@ -396,3 +396,61 @@ a { color: var(--sea); }
 @media (prefers-reduced-motion: reduce) {
   * { animation: none !important; transition: none !important; }
 }
+
+/* ============================================================
+   AGGIUNTE: Impostazioni viaggio, Alloggio, backup, hero edit
+   ============================================================ */
+
+/* Pulsante Impostazioni nella sidebar */
+.nav-settings {
+  display: flex; align-items: center; gap: 12px;
+  width: 100%; text-align: left;
+  background: transparent; border: 0; color: #aacfcd;
+  padding: 10px 12px; border-radius: 10px;
+  font-size: 14px; font-weight: 500; margin-top: 4px;
+  transition: background .15s, color .15s;
+}
+.nav-settings svg { flex: 0 0 auto; opacity: .9; }
+.nav-settings:hover { background: rgba(255,255,255,.06); color: #eafffb; }
+
+/* Pulsante "Modifica" sull'hero della Panoramica */
+.hero-edit {
+  position: absolute; top: 18px; right: 18px; z-index: 2;
+  display: inline-flex; align-items: center; gap: 6px;
+  background: rgba(255,255,255,.14); border: 1px solid rgba(255,255,255,.28);
+  color: #fff; padding: 7px 12px; border-radius: 999px;
+  font-size: 12.5px; font-weight: 600; font-family: var(--font-body);
+  backdrop-filter: blur(2px); transition: background .15s;
+}
+.hero-edit svg { width: 15px; height: 15px; }
+.hero-edit:hover { background: rgba(255,255,255,.24); }
+
+/* Card alloggio: blocco check-in/out */
+.stay {
+  display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 14px;
+  background: #f7fbfb; border: 1px solid var(--line); border-radius: var(--radius-sm);
+  padding: 12px 14px; margin: 6px 0 4px;
+}
+.stay-col { display: flex; flex-direction: column; gap: 2px; }
+.stay-col .k { font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); font-weight: 700; }
+.stay-col b { font-size: 14px; color: var(--ink); }
+.stay-col:last-child { text-align: right; align-items: flex-end; }
+.stay-arrow { color: var(--turquoise); display: grid; place-items: center; }
+
+/* Note esplicative nella modale */
+.modal-note {
+  font-size: 12px; color: var(--muted); line-height: 1.45;
+  margin: -6px 0 14px; padding-left: 2px;
+}
+
+/* Azioni backup nella modale impostazioni */
+.field-actions {
+  display: flex; flex-wrap: wrap; gap: 10px;
+  margin: 6px 0 8px; padding-top: 14px; border-top: 1px solid var(--line);
+}
+
+@media (max-width: 860px) {
+  .stay { grid-template-columns: 1fr; gap: 8px; text-align: left; }
+  .stay-col:last-child { text-align: left; align-items: flex-start; }
+  .stay-arrow { transform: rotate(90deg); justify-self: start; }
+}

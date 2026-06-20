@@ -31,6 +31,9 @@ const I = {
   check:  '<path d="M20 6L9 17l-5-5"/>',
   ext:    '<path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6M15 3h6v6M10 14L21 3"/>',
   clock:  '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+  cog:    '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9c.36.14.62.46.66.85"/>',
+  bed:    '<path d="M3 18v-6a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v6M3 14h18M5 10V7a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3M3 18v2M21 18v2"/>',
+  download:'<path d="M12 4v12m0 0l-4-4m4 4l4-4M4 18v1a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-1"/>',
 };
 function svg(path, w) { return `<svg viewBox="0 0 24 24" width="${w||18}" height="${w||18}" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${path}</svg>`; }
 
@@ -118,6 +121,7 @@ function defaultState() {
   }));
 
   return {
+    trip: { nome: TRIP.nome, start: TRIP.start, end: TRIP.end, valuta: TRIP.valuta },
     budgetTotale: 1600,
     budget: [
       { id: uid(), nome: "Voli", pianificato: 380, speso: 0, colore: "#0e7c86" },
@@ -133,6 +137,7 @@ function defaultState() {
     ],
     giorni,
     documenti: [],
+    alloggi: [],
     ristoranti: [],
     aperitivi: [],
     // spiagge note dell'isola, pre-caricate e modificabili/eliminabili
@@ -179,14 +184,39 @@ function bytes(n) { if (n < 1024) return n + " B"; if (n < 1048576) return (n / 
 /* ---------------- Stato globale ---------------- */
 let state = loadState() || defaultState();
 // migrazione leggera: garantisce le chiavi attese
-["budget","voli","giorni","documenti","ristoranti","aperitivi","spiagge"].forEach((k) => { if (!Array.isArray(state[k])) state[k] = defaultState()[k]; });
+["budget","voli","giorni","documenti","alloggi","ristoranti","aperitivi","spiagge"].forEach((k) => { if (!Array.isArray(state[k])) state[k] = defaultState()[k]; });
 if (typeof state.budgetTotale !== "number") state.budgetTotale = 1600;
+// dati del viaggio: ora vivono nello stato (modificabili e sincronizzati)
+if (!state.trip || typeof state.trip !== "object") state.trip = { nome: TRIP.nome, start: TRIP.start, end: TRIP.end, valuta: TRIP.valuta };
+syncTripRuntime(); // allinea il TRIP runtime usato da tutto il resto del codice
+
+// Mantiene il TRIP runtime (usato da fmtDate/eachDay/eur/...) allineato a state.trip
+function syncTripRuntime() {
+  TRIP.nome = state.trip.nome || "Lampedusa";
+  TRIP.start = state.trip.start || "2026-08-09";
+  TRIP.end = state.trip.end || "2026-08-15";
+  TRIP.valuta = state.trip.valuta || "EUR";
+}
+
+// Riallinea i giorni dell'itinerario all'intervallo del viaggio, preservando
+// le attività dei giorni che restano nel nuovo intervallo.
+function reconcileDays() {
+  const byDate = {};
+  state.giorni.forEach((g) => { byDate[g.data] = g; });
+  const wanted = eachDay(TRIP.start, TRIP.end);
+  state.giorni = wanted.map((d, i) => byDate[d] || {
+    data: d,
+    titolo: i === 0 ? "Arrivo a Lampedusa" : (d === TRIP.end ? "Rientro" : ""),
+    attivita: [],
+  });
+}
 
 /* ---------------- Navigazione ---------------- */
 const VIEWS = [
   { id: "panoramica", label: "Panoramica", icon: I.home,  render: renderPanoramica },
   { id: "budget",     label: "Budget",     icon: I.euro,  render: renderBudget },
   { id: "voli",       label: "Voli",       icon: I.plane, render: renderVoli },
+  { id: "alloggi",    label: "Alloggio",   icon: I.bed,   render: renderAlloggi },
   { id: "itinerario", label: "Itinerario", icon: I.route, render: renderItinerario },
   { id: "documenti",  label: "Documenti",  icon: I.doc,   render: renderDocumenti },
   { id: "ristoranti", label: "Ristoranti", icon: I.fork,  render: () => renderPlaces("ristoranti") },
@@ -199,6 +229,7 @@ function buildNav() {
   const counts = {
     documenti: state.documenti.length, ristoranti: state.ristoranti.length,
     aperitivi: state.aperitivi.length, spiagge: state.spiagge.length,
+    alloggi: state.alloggi.length,
   };
   document.getElementById("nav").innerHTML = VIEWS.map((v) => {
     const badge = counts[v.id] ? `<span class="badge">${counts[v.id]}</span>` : "";
@@ -208,10 +239,21 @@ function buildNav() {
 function go(id) {
   current = id;
   buildNav();
+  updateChrome();
   const v = VIEWS.find((x) => x.id === id);
   document.getElementById("view").innerHTML = v.render();
   window.scrollTo(0, 0);
   closeSidebar();
+}
+
+// Aggiorna titolo pagina, nome e date mostrati nella sidebar/topbar in base a state.trip
+function updateChrome() {
+  const fmtShort = (iso) => { const d = new Date(iso + "T00:00:00"); return `${d.getDate()} ${MESI[d.getMonth()].slice(0,3)}`; };
+  const range = `${fmtShort(TRIP.start)}–${fmtShort(TRIP.end)} ${new Date(TRIP.end+"T00:00:00").getFullYear()}`;
+  document.title = `${TRIP.nome} · ${range}`;
+  const bn = document.getElementById("brandName"); if (bn) bn.textContent = TRIP.nome;
+  const bd = document.getElementById("brandDates"); if (bd) bd.textContent = range;
+  const tb = document.getElementById("topbarTitle"); if (tb) tb.textContent = TRIP.nome;
 }
 
 /* ============================================================
@@ -244,9 +286,10 @@ function renderPanoramica() {
 
   return `
   <div class="hero">
+    <button class="hero-edit" data-trip-settings title="Modifica viaggio">${svg(I.edit,15)} Modifica</button>
     <div class="place">${svg(I.pin,13)} Pelagie · Sicilia</div>
     <h1>${esc(TRIP.nome)}</h1>
-    <div class="dates">${fmtDate(TRIP.start,"full")} → ${fmtDate(TRIP.end,"full")} 2026 · 7 giorni</div>
+    <div class="dates">${fmtDate(TRIP.start,"full")} → ${fmtDate(TRIP.end,"full")} ${new Date(TRIP.end+"T00:00:00").getFullYear()} · ${eachDay(TRIP.start,TRIP.end).length} giorni</div>
     <div class="hero-grid">
       <div class="hero-stat"><div class="k">Partenza tra</div><div class="v tnum">${countdown} ${cdLabel}</div></div>
       <div class="hero-stat"><div class="k">Budget</div><div class="v tnum">${eur(state.budgetTotale)}</div></div>
@@ -362,6 +405,61 @@ function renderVoloCard(v) {
       ${v.note?`<span>${esc(v.note)}</span>`:''}
     </div>
   </div>`;
+}
+
+/* ---------------- Alloggio ---------------- */
+function renderAlloggi() {
+  return `
+  <div class="view-head">
+    <div class="eyebrow">Dove dormire</div>
+    <h1>Alloggio</h1>
+    <p>Casa, B&amp;B o hotel sull'isola. Salva indirizzo, check-in/out, codice prenotazione, prezzo e contatti.</p>
+  </div>
+  <div class="section-head"><h2>Strutture</h2><button class="btn primary sm" data-add-alloggio>${svg(I.plus,15)} Aggiungi alloggio</button></div>
+  ${state.alloggi.length ? state.alloggi.map(renderAlloggioCard).join("") : emptyState(I.bed, "Nessun alloggio inserito", "Aggiungi la struttura dove dormirai.")}
+  `;
+}
+function renderAlloggioCard(a) {
+  const nights = (a.checkin && a.checkout) ? eachDay(a.checkin, a.checkout).length - 1 : 0;
+  const meta = [];
+  if (a.prezzo) meta.push(`Totale: <b class="tnum">${eur(a.prezzo)}</b>`);
+  if (nights > 0) meta.push(`${nights} nott${nights === 1 ? "e" : "i"}`);
+  if (a.prenotazione) meta.push(`Prenotazione: <b>${esc(a.prenotazione)}</b>`);
+  if (a.telefono) meta.push(`Tel: <b>${esc(a.telefono)}</b>`);
+  return `<div class="card">
+    <div class="card-head">
+      <h3>${svg(I.bed,18)} ${esc(a.nome || "Alloggio")}</h3>
+      <div><button class="btn sm icon" data-edit-alloggio="${a.id}">${svg(I.edit,14)}</button> <button class="btn sm icon danger" data-del-alloggio="${a.id}">${svg(I.trash,14)}</button></div>
+    </div>
+    ${a.indirizzo ? `<div class="aloc" style="margin-bottom:8px">${svg(I.pin,13)} ${esc(a.indirizzo)}</div>` : ""}
+    <div class="stay">
+      <div class="stay-col"><span class="k">Check-in</span><b>${a.checkin ? fmtDate(a.checkin, "full") : "—"}</b></div>
+      <div class="stay-arrow">${svg(I.route,16)}</div>
+      <div class="stay-col"><span class="k">Check-out</span><b>${a.checkout ? fmtDate(a.checkout, "full") : "—"}</b></div>
+    </div>
+    ${meta.length ? `<div class="flight-meta">${meta.map((m) => `<span>${m}</span>`).join("")}</div>` : ""}
+    ${a.note ? `<div class="pnote" style="margin-top:8px">${esc(a.note)}</div>` : ""}
+    ${a.link ? `<div style="margin-top:10px"><a class="maps" href="${esc(a.link)}" target="_blank" rel="noopener">${svg(I.pin,13)} Apri su Maps</a></div>` : ""}
+  </div>`;
+}
+function formAlloggio(a) {
+  const nuovo = !a;
+  a = a || { nome: "", indirizzo: "", checkin: TRIP.start, checkout: TRIP.end, prezzo: 0, prenotazione: "", telefono: "", link: "", note: "" };
+  openModal(nuovo ? "Nuovo alloggio" : "Modifica alloggio",
+    `${field("Nome struttura", "f_nome", a.nome, "text", 'placeholder="es. Casa Maruzza"')}
+     ${field("Indirizzo", "f_ind", a.indirizzo)}
+     <div class="field-row">${field("Check-in", "f_cin", a.checkin, "date")}${field("Check-out", "f_cout", a.checkout, "date")}</div>
+     <div class="field-row">${field("Prezzo totale (€)", "f_prezzo", a.prezzo, "number", 'min="0" step="1"')}${field("Codice prenotazione", "f_pren", a.prenotazione)}</div>
+     ${field("Telefono / contatto", "f_tel", a.telefono)}
+     ${field("Link a Maps / annuncio", "f_link", a.link, "url", 'placeholder="https://..."')}
+     ${area("Note", "f_note", a.note)}`,
+    () => {
+      const nome = val("f_nome"); if (!nome) return toast("Inserisci un nome");
+      const obj = { nome, indirizzo: val("f_ind"), checkin: val("f_cin"), checkout: val("f_cout"), prezzo: numVal("f_prezzo"), prenotazione: val("f_pren"), telefono: val("f_tel"), link: val("f_link"), note: val("f_note") };
+      if (nuovo) state.alloggi.push({ id: uid(), ...obj });
+      else Object.assign(state.alloggi.find((x) => x.id === a.id), obj);
+      commit(); toast(nuovo ? "Alloggio aggiunto" : "Alloggio aggiornato");
+    });
 }
 
 /* ---------------- Itinerario ---------------- */
@@ -607,6 +705,89 @@ function formPlace(kind, p) {
 }
 
 /* ============================================================
+   Impostazioni viaggio + Backup (esporta/importa)
+   ============================================================ */
+function currentTripId() {
+  try { return localStorage.getItem("lampedusa_trip_id_override") || window.TRIP_ID || "default"; }
+  catch (e) { return window.TRIP_ID || "default"; }
+}
+function formTrip() {
+  const t = state.trip;
+  const tid = currentTripId();
+  openModal("Impostazioni viaggio",
+    `${field("Nome del viaggio", "f_tnome", t.nome)}
+     <div class="field-row">${field("Data inizio", "f_tstart", t.start, "date")}${field("Data fine", "f_tend", t.end, "date")}</div>
+     <div class="modal-note">Cambiando le date, i giorni dell'itinerario vengono aggiornati. Le attività dei giorni che restano nel periodo sono conservate.</div>
+
+     <div class="field" style="margin-top:18px"><label for="f_tid">Codice viaggio (sync)</label>
+       <input id="f_tid" type="text" value="${esc(tid)}" placeholder="es. lampedusa-2026" />
+     </div>
+     <div class="modal-note">Lo stesso codice su due dispositivi = stessi dati condivisi. Cambiarlo apre un viaggio separato (la pagina si ricarica).</div>
+
+     <div class="field-actions">
+       <button type="button" class="btn sea sm" data-export>${svg(I.download,15)} Esporta backup (.json)</button>
+       <button type="button" class="btn sm" data-import-btn>${svg(I.upload,15)} Importa backup</button>
+       <input type="file" id="importFile" accept="application/json,.json" hidden />
+     </div>
+     <div class="modal-note">Il backup include tutti i dati tranne i PDF (che restano nel browser).</div>`,
+    () => {
+      const nome = val("f_tnome"); if (!nome) return toast("Inserisci un nome viaggio");
+      const start = val("f_tstart"), end = val("f_tend");
+      if (!start || !end) return toast("Imposta entrambe le date");
+      if (end < start) return toast("La data fine è prima dell'inizio");
+
+      state.trip = { nome, start, end, valuta: state.trip.valuta || "EUR" };
+      syncTripRuntime();
+      reconcileDays();
+
+      const newTid = val("f_tid") || "default";
+      const tidChanged = newTid !== currentTripId();
+      if (tidChanged) {
+        try { localStorage.setItem("lampedusa_trip_id_override", newTid); } catch (e) { /* storage non disponibile */ }
+      }
+      commit();
+      toast("Viaggio aggiornato");
+      if (tidChanged) setTimeout(() => location.reload(), 600); // riconnetto il sync al nuovo codice
+    });
+}
+
+function exportData() {
+  const dump = JSON.parse(JSON.stringify(state));
+  delete dump.documenti; // i PDF non sono esportabili in JSON
+  const payload = { app: "lampedusa-trip-planner", schema: 1, exportedAt: new Date().toISOString(), state: dump };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `lampedusa-backup-${new Date().toISOString().slice(0,10)}.json`;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 4000);
+  toast("Backup esportato");
+}
+function importData(file) {
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const parsed = JSON.parse(reader.result);
+      const incoming = parsed && parsed.state ? parsed.state : parsed;
+      if (!incoming || typeof incoming !== "object") throw new Error("formato non valido");
+      if (!window.confirm("Importare questo backup? Sostituirà i dati attuali (i PDF restano).")) return;
+      const localDocs = state.documenti;
+      state = Object.assign(defaultState(), incoming);
+      state.documenti = localDocs;
+      ["budget","voli","giorni","alloggi","ristoranti","aperitivi","spiagge"].forEach((k) => { if (!Array.isArray(state[k])) state[k] = defaultState()[k]; });
+      if (!state.trip || typeof state.trip !== "object") state.trip = defaultState().trip;
+      syncTripRuntime();
+      commit();
+      toast("Backup importato");
+    } catch (e) {
+      toast("File non valido");
+    }
+  };
+  reader.readAsText(file);
+}
+
+/* ============================================================
    PDF upload
    ============================================================ */
 async function handleFiles(files) {
@@ -691,7 +872,8 @@ const Sync = {
     try {
       if (!firebase.apps.length) firebase.initializeApp(cfg);
       await firebase.auth().signInAnonymously();
-      this.ref = firebase.firestore().collection("trips").doc(window.TRIP_ID || "default");
+      const tripId = currentTripId();
+      this.ref = firebase.firestore().collection("trips").doc(tripId);
       this.active = true;
       this.ref.onSnapshot(
         (snap) => this.onRemote(snap),
@@ -712,6 +894,9 @@ const Sync = {
     const localDocs = state.documenti;                    // i PDF restano locali, non li tocco
     state = Object.assign(defaultState(), data.state || {});
     state.documenti = localDocs;
+    if (state.trip) syncTripRuntime();                    // allineo il viaggio (nome/date) a quello in cloud
+    // persisto in locale lo stato remoto: così un reload mostra subito gli stessi dati
+    if (STORAGE_OK) { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) { /* quota: ignoro */ } }
     this.applying = true;
     buildNav();
     // non re-renderizzo se c'è una modale aperta (per non interrompere una modifica)
@@ -738,12 +923,22 @@ const Sync = {
    Event delegation
    ============================================================ */
 document.addEventListener("click", (e) => {
-  const t = e.target.closest("[data-view],[data-go],[data-add-budget],[data-edit-budget],[data-del-budget],[data-edit-total],[data-add-volo],[data-edit-volo],[data-del-volo],[data-toggle-day],[data-edit-day],[data-add-act],[data-edit-act],[data-del-act],[data-add-place],[data-edit-place],[data-del-place],[data-fav],[data-open-doc],[data-del-doc]");
+  const t = e.target.closest("[data-view],[data-go],[data-trip-settings],[data-add-budget],[data-edit-budget],[data-del-budget],[data-edit-total],[data-add-volo],[data-edit-volo],[data-del-volo],[data-add-alloggio],[data-edit-alloggio],[data-del-alloggio],[data-toggle-day],[data-edit-day],[data-add-act],[data-edit-act],[data-del-act],[data-add-place],[data-edit-place],[data-del-place],[data-fav],[data-open-doc],[data-del-doc],[data-export],[data-import-btn]");
   if (!t) return;
   const d = t.dataset;
 
   if (d.view) return go(d.view);
   if (d.go) return go(d.go);
+  if ("tripSettings" in d) return formTrip();
+
+  // Backup (dentro la modale Impostazioni)
+  if ("export" in d) return exportData();
+  if ("importBtn" in d) { const fi = document.getElementById("importFile"); if (fi) fi.click(); return; }
+
+  // Alloggio
+  if ("addAlloggio" in d) return formAlloggio();
+  if (d.editAlloggio) return formAlloggio(state.alloggi.find((x) => x.id === d.editAlloggio));
+  if (d.delAlloggio) return confirmDel("Eliminare questo alloggio?", () => { state.alloggi = state.alloggi.filter((x) => x.id !== d.delAlloggio); commit(); toast("Alloggio eliminato"); });
 
   // Budget
   if ("addBudget" in d) return formBudget();
@@ -794,6 +989,7 @@ document.getElementById("scrim").addEventListener("click", closeSidebar);
 /* upload: delega per dropzone (ricreata a ogni render) */
 document.addEventListener("change", (e) => {
   if (e.target.id === "fileInput") { handleFiles(e.target.files); e.target.value = ""; }
+  if (e.target.id === "importFile") { if (e.target.files[0]) importData(e.target.files[0]); e.target.value = ""; }
 });
 document.addEventListener("dragover", (e) => { const dz = e.target.closest("#dropzone"); if (dz) { e.preventDefault(); dz.classList.add("drag"); } });
 document.addEventListener("dragleave", (e) => { const dz = e.target.closest("#dropzone"); if (dz) dz.classList.remove("drag"); });
