@@ -724,9 +724,15 @@ document.addEventListener("drop", (e) => { const dz = e.target.closest("#dropzon
 /* ============================================================
    Avvio
    ============================================================ */
-(async function init() {
-  await IDB.open();
-  updateStorageNote();
-  buildNav();
-  go("panoramica");
-})();
+
+   (function init() {
+     updateStorageNote();
+     buildNav();
+     go("panoramica");
+     // IndexedDB aperto in background: se non risponde entro 3s, si prosegue
+     // comunque (i PDF useranno il fallback in memoria per la sessione).
+     Promise.race([
+       IDB.open(),
+       new Promise((r) => setTimeout(() => r(false), 3000)),
+     ]).then(updateStorageNote).catch(() => {});
+   })();
