@@ -172,7 +172,11 @@ function fmtDate(iso, opt) {
   if (opt === "year") return `${s} ${d.getFullYear()}`;
   return s;
 }
-function eur(n) { return new Intl.NumberFormat("it-IT", { style: "currency", currency: TRIP.valuta, maximumFractionDigits: 0 }).format(Math.round(n || 0)); }
+function eur(n) {
+  const v = Math.round(n || 0);
+  const s = Math.abs(v).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+  return (v < 0 ? "-" : "") + s + "\u00A0€";
+}
 function esc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
 function daysUntil(iso) {
   const today = new Date(); today.setHours(0, 0, 0, 0);
@@ -286,7 +290,6 @@ function renderPanoramica() {
 
   return `
   <div class="hero">
-    <button class="hero-edit" data-trip-settings title="Modifica viaggio">${svg(I.edit,15)} Modifica</button>
     <div class="place">${svg(I.pin,13)} Pelagie · Sicilia</div>
     <h1>${esc(TRIP.nome)}</h1>
     <div class="dates">${fmtDate(TRIP.start,"full")} → ${fmtDate(TRIP.end,"full")} ${new Date(TRIP.end+"T00:00:00").getFullYear()} · ${eachDay(TRIP.start,TRIP.end).length} giorni</div>
@@ -384,7 +387,7 @@ function renderVoli() {
     <p>Lampedusa (LMP) si raggiunge in aereo. Inserisci tratte, orari, codici di prenotazione e prezzi.</p>
   </div>
   <div class="section-head"><h2>Tratte</h2><button class="btn primary sm" data-add-volo>${svg(I.plus,15)} Aggiungi tratta</button></div>
-  ${state.voli.length ? state.voli.map(renderVoloCard).join("") : emptyState(I.plane, "Nessun volo inserito", "Aggiungi la tua prima tratta.")}
+  ${state.voli.length ? `<div class="cards-stack">${state.voli.map(renderVoloCard).join("")}</div>` : emptyState(I.plane, "Nessun volo inserito", "Aggiungi la tua prima tratta.")}
   `;
 }
 function renderVoloCard(v) {
@@ -416,7 +419,7 @@ function renderAlloggi() {
     <p>Casa, B&amp;B o hotel sull'isola. Salva indirizzo, check-in/out, codice prenotazione, prezzo e contatti.</p>
   </div>
   <div class="section-head"><h2>Strutture</h2><button class="btn primary sm" data-add-alloggio>${svg(I.plus,15)} Aggiungi alloggio</button></div>
-  ${state.alloggi.length ? state.alloggi.map(renderAlloggioCard).join("") : emptyState(I.bed, "Nessun alloggio inserito", "Aggiungi la struttura dove dormirai.")}
+  ${state.alloggi.length ? `<div class="cards-stack">${state.alloggi.map(renderAlloggioCard).join("")}</div>` : emptyState(I.bed, "Nessun alloggio inserito", "Aggiungi la struttura dove dormirai.")}
   `;
 }
 function renderAlloggioCard(a) {
@@ -503,9 +506,9 @@ function renderDocumenti() {
     <p>Carica i PDF utili: carte d'imbarco, prenotazioni, voucher, mappe. Restano salvati in questo browser.</p>
   </div>
   <label class="dropzone" id="dropzone">
-    ${svg(I.upload,34)}
-    <div style="margin-top:10px"><b>Trascina qui i PDF</b> o clicca per selezionarli</div>
-    <div style="font-size:12.5px;color:var(--muted);margin-top:4px">Solo file PDF</div>
+    <span class="dz-icon">${svg(I.upload,24)}</span>
+    <span class="dz-title">Trascina qui i PDF</span>
+    <span class="dz-sub">oppure tocca per selezionare · solo file PDF</span>
     <input type="file" id="fileInput" accept="application/pdf" multiple hidden />
   </label>
   <div class="section-head"><h2>File caricati</h2><span class="count">${state.documenti.length}</span></div>
