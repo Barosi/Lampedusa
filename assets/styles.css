@@ -58,7 +58,12 @@ button { font-family: inherit; cursor: pointer; }
 input, select, textarea { font-family: inherit; font-size: 14px; }
 a { color: var(--sea); }
 
+/* icone inline allineate al centro del testo (niente più "sfalsato") */
+svg { vertical-align: middle; }
+
 .tnum { font-variant-numeric: tabular-nums; white-space: nowrap; }
+/* simbolo valuta: font del testo, dimensione bilanciata, spazio corretto */
+.cur { font-family: var(--font-body); font-weight: 600; font-size: .82em; margin-left: .12em; }
 
 /* ---------- Layout app ---------- */
 .app {

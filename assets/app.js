@@ -15,7 +15,7 @@ const TRIP = {
 /* ---------------- Icone (inline SVG) ---------------- */
 const I = {
   home:   '<path d="M3 11l9-8 9 8M5 10v10h5v-6h4v6h5V10"/>',
-  euro:   '<path d="M15 7a5 5 0 1 0 0 10M5 10h8M5 14h8"/>',
+  euro:   '<path d="M17.5 8.4A6 6 0 1 0 17.5 15.6"/><path d="M5 10.6h8.5M5 13.4h7"/>',
   plane:  '<path d="M21 15l-8-3V5a2 2 0 0 0-4 0v7l-6 2v2l6-1v3l-2 1v1l4-1 4 1v-1l-2-1v-3l6 1z"/>',
   route:  '<path d="M9 6H6a3 3 0 0 0 0 6h12a3 3 0 0 1 0 6h-3"/><circle cx="6" cy="6" r="2"/><circle cx="18" cy="18" r="2"/>',
   doc:    '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/>',
@@ -159,8 +159,8 @@ function defaultState() {
 /* ---------------- Utility ---------------- */
 function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
 function eachDay(a, b) {
-  const out = []; const d = new Date(a + "T00:00:00"); const end = new Date(b + "T00:00:00");
-  while (d <= end) { out.push(d.toISOString().slice(0, 10)); d.setDate(d.getDate() + 1); }
+  const out = []; const d = new Date(a + "T00:00:00Z"); const end = new Date(b + "T00:00:00Z");
+  while (d <= end) { out.push(d.toISOString().slice(0, 10)); d.setUTCDate(d.getUTCDate() + 1); }
   return out;
 }
 function isLast(d) { return d === TRIP.end; }
@@ -177,7 +177,7 @@ function fmtDate(iso, opt) {
 function eur(n) {
   const v = Math.round(n || 0);
   const s = Math.abs(v).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".");
-  return (v < 0 ? "-" : "") + s + "\u00A0€";
+  return (v < 0 ? "\u2212" : "") + s + '<span class="cur">€</span>';
 }
 function esc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
 function daysUntil(iso) {
