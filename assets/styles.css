@@ -169,7 +169,6 @@ a { color: var(--sea); }
   background: rgba(255,255,255,.10);
   border: 1px solid rgba(255,255,255,.16);
   border-radius: 14px; padding: 14px 16px;
-  backdrop-filter: blur(2px);
 }
 .hero-stat .k { font-size: 12px; color: #bfeae5; letter-spacing: .04em; }
 .hero-stat .v { font-family: var(--font-display); font-size: 26px; margin-top: 2px; }
@@ -335,10 +334,9 @@ a { color: var(--sea); }
 
 /* ---------- Modale ---------- */
 .modal-bg {
-  position: fixed; inset: 0; background: rgba(6,37,48,.55);
+  position: fixed; inset: 0; background: rgba(6,37,48,.62);
   display: none; align-items: flex-start; justify-content: center;
   padding: 40px 16px; z-index: 60; overflow-y: auto;
-  backdrop-filter: blur(2px);
 }
 .modal-bg.show { display: flex; }
 .modal {
@@ -390,9 +388,6 @@ a { color: var(--sea); }
   .view { padding: 18px 16px 72px; }
   .scrim { position: fixed; inset: 0; background: rgba(6,37,48,.45); z-index: 45; display: none; }
   .scrim.show { display: block; }
-
-  /* niente blur su mobile: più fluido */
-  .hero-stat, .modal-bg, .hero-edit { backdrop-filter: none; }
 
   /* hero più compatto */
   .hero { padding: 24px 20px 22px; border-radius: 18px; }
@@ -494,10 +489,10 @@ a { color: var(--sea); }
 .hero-edit {
   position: absolute; top: 18px; right: 18px; z-index: 2;
   display: inline-flex; align-items: center; gap: 6px;
-  background: rgba(255,255,255,.14); border: 1px solid rgba(255,255,255,.28);
+  background: rgba(255,255,255,.18); border: 1px solid rgba(255,255,255,.34);
   color: #fff; padding: 7px 12px; border-radius: 999px;
   font-size: 12.5px; font-weight: 600; font-family: var(--font-body);
-  backdrop-filter: blur(2px); transition: background .15s;
+  transition: background .15s;
 }
 .hero-edit svg { width: 15px; height: 15px; }
 .hero-edit:hover { background: rgba(255,255,255,.24); }
