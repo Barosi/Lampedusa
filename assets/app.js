@@ -355,22 +355,22 @@ function renderBudget() {
   <div class="section-head"><h2>Categorie</h2>
     <button class="btn primary sm" data-add-budget>${svg(I.plus,15)} Aggiungi categoria</button></div>
 
-  <div class="card" style="padding:8px 10px">
+  <div class="card bud-wrap">
     <table class="bud-table">
       <thead><tr><th>Categoria</th><th class="num">Pianificato</th><th class="num">Speso</th><th class="num">Diff.</th><th></th></tr></thead>
       <tbody>
         ${state.budget.map((b) => {
           const diff = (+b.pianificato||0) - (+b.speso||0);
           return `<tr>
-            <td><span class="cat-dot" style="background:${b.colore||'#16b1ac'}"></span>${esc(b.nome)}</td>
-            <td class="num tnum">${eur(b.pianificato)}</td>
-            <td class="num tnum">${eur(b.speso)}</td>
-            <td class="num tnum" style="color:${diff<0?'var(--coral-deep)':'var(--ink-soft)'}">${diff<0?'-':''}${eur(Math.abs(diff))}</td>
-            <td class="num"><button class="btn sm icon" data-edit-budget="${b.id}">${svg(I.edit,14)}</button> <button class="btn sm icon danger" data-del-budget="${b.id}">${svg(I.trash,14)}</button></td>
+            <td data-label="Categoria"><span class="cat-dot" style="background:${b.colore||'#16b1ac'}"></span>${esc(b.nome)}</td>
+            <td class="num tnum" data-label="Pianificato">${eur(b.pianificato)}</td>
+            <td class="num tnum" data-label="Speso">${eur(b.speso)}</td>
+            <td class="num tnum" data-label="Differenza" style="color:${diff<0?'var(--coral-deep)':'var(--ink-soft)'}">${diff<0?'-':''}${eur(Math.abs(diff))}</td>
+            <td class="num actions" data-label=""><button class="btn sm icon" data-edit-budget="${b.id}" aria-label="Modifica">${svg(I.edit,14)}</button> <button class="btn sm icon danger" data-del-budget="${b.id}" aria-label="Elimina">${svg(I.trash,14)}</button></td>
           </tr>`;
         }).join("")}
       </tbody>
-      <tfoot class="bud-foot"><tr><td>Totale</td><td class="num tnum">${eur(pian)}</td><td class="num tnum">${eur(speso)}</td><td></td><td></td></tr></tfoot>
+      <tfoot class="bud-foot"><tr><td data-label="Totale">Totale</td><td class="num tnum" data-label="Pianificato">${eur(pian)}</td><td class="num tnum" data-label="Speso">${eur(speso)}</td><td class="hide-sm"></td><td class="hide-sm"></td></tr></tfoot>
     </table>
   </div>`;
 }
