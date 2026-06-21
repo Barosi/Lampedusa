@@ -177,7 +177,7 @@ function fmtDate(iso, opt) {
 function eur(n) {
   const v = Math.round(n || 0);
   const s = Math.abs(v).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".");
-  return (v < 0 ? "\u2212" : "") + s + '<span class="cur">€</span>';
+  return (v < 0 ? "-" : "") + s + "\u00A0€";
 }
 function esc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
 function daysUntil(iso) {
