@@ -34,6 +34,8 @@ const I = {
   cog:    '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9c.36.14.62.46.66.85"/>',
   bed:    '<path d="M3 18v-6a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v6M3 14h18M5 10V7a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3M3 18v2M21 18v2"/>',
   download:'<path d="M12 4v12m0 0l-4-4m4 4l4-4M4 18v1a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-1"/>',
+  refresh: '<path d="M21 12a9 9 0 1 1-2.6-6.4M21 3v5h-5"/>',
+  google:  '<path d="M21 12.2c0-.7-.06-1.4-.18-2.05H12v3.9h5.05a4.3 4.3 0 0 1-1.87 2.83v2.35h3.02C19.96 17.5 21 15.1 21 12.2z"/><path d="M12 21c2.53 0 4.65-.84 6.2-2.27l-3.02-2.35c-.84.56-1.9.9-3.18.9-2.44 0-4.5-1.65-5.24-3.87H3.64v2.42A9 9 0 0 0 12 21z"/><path d="M6.76 13.41A5.4 5.4 0 0 1 6.76 10v-2.42H3.64a9 9 0 0 0 0 8.25z"/><path d="M12 6.58c1.38 0 2.6.47 3.57 1.4l2.68-2.68A8.96 8.96 0 0 0 12 3a9 9 0 0 0-8.36 5.58L6.76 10C7.5 7.79 9.56 6.58 12 6.58z"/>',
 };
 function svg(path, w) { return `<svg viewBox="0 0 24 24" width="${w||18}" height="${w||18}" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${path}</svg>`; }
 
@@ -193,6 +195,7 @@ if (typeof state.budgetTotale !== "number") state.budgetTotale = 1600;
 // dati del viaggio: ora vivono nello stato (modificabili e sincronizzati)
 if (!state.trip || typeof state.trip !== "object") state.trip = { nome: TRIP.nome, start: TRIP.start, end: TRIP.end, valuta: TRIP.valuta };
 syncTripRuntime(); // allinea il TRIP runtime usato da tutto il resto del codice
+reconcileDays();   // VINCOLO: i giorni dell'itinerario seguono sempre le date del viaggio
 
 // Mantiene il TRIP runtime (usato da fmtDate/eachDay/eur/...) allineato a state.trip
 function syncTripRuntime() {
@@ -442,6 +445,7 @@ function renderAlloggioCard(a) {
     </div>
     ${meta.length ? `<div class="flight-meta">${meta.map((m) => `<span>${m}</span>`).join("")}</div>` : ""}
     ${a.note ? `<div class="pnote" style="margin-top:8px">${esc(a.note)}</div>` : ""}
+    ${renderGoogleBlock("alloggi", a)}
     ${a.link ? `<div style="margin-top:10px"><a class="maps" href="${esc(a.link)}" target="_blank" rel="noopener">${svg(I.pin,13)} Apri su Maps</a></div>` : ""}
   </div>`;
 }
@@ -566,8 +570,9 @@ function renderPlace(kind, p) {
       <button class="fav ${p.preferito?'on':''}" data-fav="${kind}|${p.id}" title="Preferito">${svg(I.star,18)}</button>
     </div>
     ${(price||type)?`<div class="ptags">${type}${price}</div>`:''}
-    ${p.rating?`<div>${stars}</div>`:''}
+    ${p.rating?`<div class="myrating"><span class="rl">Tuo voto</span> ${stars}</div>`:''}
     ${p.note?`<div class="pnote">${esc(p.note)}</div>`:''}
+    ${renderGoogleBlock(kind, p)}
     <div class="pfoot">
       ${p.fatto?`<span class="chip-done">${svg(I.check,14)} Fatto</span>`:''}
       <span class="spacer"></span>
@@ -581,6 +586,99 @@ function renderPlace(kind, p) {
 /* ---------------- Empty state ---------------- */
 function emptyState(icon, title, sub) {
   return `<div class="empty">${svg(icon,40)}<b>${esc(title)}</b><div style="margin-top:4px;font-size:13.5px">${esc(sub)}</div></div>`;
+}
+
+/* ============================================================
+   Google Places — recensioni e voto (opzionale)
+   Attivo solo se window.GOOGLE_MAPS_API_KEY è valorizzato.
+   Usa la Places API (New) via REST (supporta CORS dal browser).
+   I dati recuperati vengono salvati nello stato → sincronizzati e
+   visibili anche all'altra persona senza nuove chiamate API.
+   ============================================================ */
+const Places = {
+  key() { return (window.GOOGLE_MAPS_API_KEY || "").trim(); },
+  enabled() { const k = this.key(); return !!k && k !== "INCOLLA_QUI"; },
+  async search(query) {
+    const res = await fetch("https://places.googleapis.com/v1/places:searchText", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Goog-Api-Key": this.key(),
+        "X-Goog-FieldMask": "places.id,places.displayName,places.formattedAddress,places.rating,places.userRatingCount,places.googleMapsUri,places.reviews",
+      },
+      body: JSON.stringify({ textQuery: query, languageCode: "it", regionCode: "IT", maxResultCount: 1 }),
+    });
+    if (!res.ok) {
+      let detail = "HTTP " + res.status;
+      try { const j = await res.json(); if (j.error) detail = j.error.status || j.error.message || detail; } catch (e) {}
+      throw new Error(detail);
+    }
+    const data = await res.json();
+    return (data.places && data.places[0]) || null;
+  },
+};
+function mapGmaps(pl) {
+  return {
+    placeId: pl.id || "",
+    rating: pl.rating || 0,
+    count: pl.userRatingCount || 0,
+    uri: pl.googleMapsUri || "",
+    reviews: (pl.reviews || []).slice(0, 3).map((r) => ({
+      autore: (r.authorAttribution && r.authorAttribution.displayName) || "Utente Google",
+      voto: r.rating || 0,
+      testo: (r.text && r.text.text) || (r.originalText && r.originalText.text) || "",
+      quando: r.relativePublishTimeDescription || "",
+    })),
+    aggiornato: Date.now(),
+  };
+}
+function googleStars(rating, w) {
+  const r = Math.round(rating || 0);
+  return `<span class="stars">${[1,2,3,4,5].map((n) => `<svg viewBox="0 0 24 24" width="${w||13}" height="${w||13}" class="${n<=r?'on':''}" fill="currentColor" stroke="none"><path d="M12 2l3 6.5 7 .8-5 4.7 1.3 7L12 17.8 5.7 21l1.3-7-5-4.7 7-.8z"/></svg>`).join("")}</span>`;
+}
+function renderGoogleBlock(kind, p) {
+  if (!p.gmaps && !Places.enabled()) return ""; // non configurato e nessun dato → niente
+  if (!p.gmaps) {
+    return `<button class="btn sm ghost gbtn" data-gmaps="${kind}|${p.id}">${svg(I.google,15)} Recensioni Google</button>`;
+  }
+  const g = p.gmaps;
+  const reviews = (g.reviews || []).map((r) => `
+    <div class="greview">
+      <div class="grh"><b>${esc(r.autore)}</b> ${googleStars(r.voto,11)}${r.quando?`<span class="gtime">${esc(r.quando)}</span>`:""}</div>
+      ${r.testo ? `<div class="grtext">${esc(r.testo.length>180 ? r.testo.slice(0,180)+"…" : r.testo)}</div>` : ""}
+    </div>`).join("");
+  return `<div class="gblock">
+    <div class="grating">${svg(I.google,15)}
+      ${g.rating ? `<b class="tnum">${g.rating.toFixed(1)}</b> ${googleStars(g.rating)} <span class="gcount">${g.count} recensioni</span>` : `<span class="gcount">Nessun voto su Google</span>`}
+      <button class="btn sm icon ghost" data-gmaps="${kind}|${p.id}" title="Aggiorna recensioni">${svg(I.refresh,14)}</button>
+    </div>
+    ${reviews ? `<div class="greviews">${reviews}</div>` : ""}
+    ${g.uri ? `<a class="maps gmaps-link" href="${esc(g.uri)}" target="_blank" rel="noopener">${svg(I.ext,12)} Apri su Google Maps</a>` : ""}
+    <div class="gattr">Recensioni e voti forniti da Google</div>
+  </div>`;
+}
+let gmapsBusy = false;
+async function fetchGoogle(kind, id) {
+  if (!Places.enabled()) { toast("Configura la chiave Google in firebase-config.js"); return; }
+  if (gmapsBusy) return;
+  const list = state[kind] || [];
+  const obj = list.find((x) => x.id === id);
+  if (!obj) return;
+  gmapsBusy = true;
+  toast("Cerco su Google…");
+  try {
+    const zona = obj.zona || obj.indirizzo || "";
+    const query = `${obj.nome} ${zona} Lampedusa`.replace(/\s+/g, " ").trim();
+    const pl = await Places.search(query);
+    if (!pl) { toast("Nessun risultato su Google"); gmapsBusy = false; return; }
+    obj.gmaps = mapGmaps(pl);
+    if (!obj.link && obj.gmaps.uri) obj.link = obj.gmaps.uri;
+    saveState(); buildNav(); go(current);
+    toast("Recensioni Google aggiornate");
+  } catch (e) {
+    toast("Google: " + (e.message || "errore"));
+  }
+  gmapsBusy = false;
 }
 
 /* ============================================================
@@ -717,10 +815,12 @@ function currentTripId() {
 function formTrip() {
   const t = state.trip;
   const tid = currentTripId();
+  const durata = eachDay(t.start, t.end).length;
   openModal("Impostazioni viaggio",
     `${field("Nome del viaggio", "f_tnome", t.nome)}
      <div class="field-row">${field("Data inizio", "f_tstart", t.start, "date")}${field("Data fine", "f_tend", t.end, "date")}</div>
-     <div class="modal-note">Cambiando le date, i giorni dell'itinerario vengono aggiornati. Le attività dei giorni che restano nel periodo sono conservate.</div>
+     <div class="trip-duration">${svg(I.route,15)} L'itinerario avrà <b>${durata} ${durata===1?"giorno":"giorni"}</b>, uno per ogni data del viaggio.</div>
+     <div class="modal-note">Cambiando le date, i giorni dell'itinerario si aggiornano automaticamente. Le attività dei giorni che restano nel periodo vengono conservate.</div>
 
      <div class="field" style="margin-top:18px"><label for="f_tid">Codice viaggio (sync)</label>
        <input id="f_tid" type="text" value="${esc(tid)}" placeholder="es. lampedusa-2026" />
@@ -781,6 +881,7 @@ function importData(file) {
       ["budget","voli","giorni","alloggi","ristoranti","aperitivi","spiagge"].forEach((k) => { if (!Array.isArray(state[k])) state[k] = defaultState()[k]; });
       if (!state.trip || typeof state.trip !== "object") state.trip = defaultState().trip;
       syncTripRuntime();
+      reconcileDays();
       commit();
       toast("Backup importato");
     } catch (e) {
@@ -847,15 +948,42 @@ function updateSyncBadge(status) {
   const dot = document.getElementById("syncDot");
   const txt = document.getElementById("syncText");
   if (!dot || !txt) return;
+  const code = currentTripId();
   const map = {
-    ok:   ["#1e9e6a", "Sincronizzato in cloud"],
+    ok:   ["#1e9e6a", "Sincronizzato · " + code],
     wait: ["#16b1ac", "Connessione al cloud…"],
     off:  ["#7d949b", "Solo questo dispositivo"],
-    err:  ["#e8a33d", "Sync non disponibile"],
+    err:  ["#e8a33d", "Sync non disponibile · controlla connessione"],
   };
   const [c, t] = map[status] || map.off;
   dot.style.background = c; txt.textContent = t;
+  if (status === "ok") hideSyncBanner();
 }
+
+/* Banner di errore sincronizzazione, con codice */
+const SYNC_ERRORS = {
+  "permission-denied": "Permessi negati: controlla le regole Firestore.",
+  "unauthenticated": "Non autenticato sul cloud.",
+  "auth/operation-not-allowed": "Login anonimo non abilitato in Firebase (Authentication → Sign-in method).",
+  "auth/network-request-failed": "Rete non disponibile: impossibile contattare Firebase.",
+  "unavailable": "Cloud non raggiungibile (sei offline?).",
+  "failed-precondition": "Database Firestore non inizializzato o indice mancante.",
+  "resource-exhausted": "Quota Firebase esaurita.",
+  "not-found": "Database/progetto Firebase non trovato.",
+  "invalid-argument": "Configurazione Firebase non valida.",
+};
+function showSyncBanner(code, detail) {
+  const b = document.getElementById("syncBanner");
+  if (!b) return;
+  const human = SYNC_ERRORS[code] || detail || "Errore di sincronizzazione col cloud.";
+  b.innerHTML =
+    `<span class="sb-ico">!</span>` +
+    `<span class="sb-txt"><b>Sincronizzazione non riuscita</b> — ${esc(human)}` +
+    (code ? ` <code>${esc(String(code))}</code>` : "") + `</span>` +
+    `<button class="sb-x" data-sync-banner-close aria-label="Chiudi">${svg('<path d="M18 6L6 18M6 6l12 12"/>',16)}</button>`;
+  b.hidden = false;
+}
+function hideSyncBanner() { const b = document.getElementById("syncBanner"); if (b) b.hidden = true; }
 
 /* ============================================================
    Sincronizzazione cloud (Firebase Firestore) — opzionale.
@@ -880,12 +1008,13 @@ const Sync = {
       this.active = true;
       this.ref.onSnapshot(
         (snap) => this.onRemote(snap),
-        (err) => { console.warn("Sync error:", err.message); updateSyncBadge("err"); }
+        (err) => { console.warn("Sync error:", err.code, err.message); updateSyncBadge("err"); showSyncBanner(err.code, err.message); }
       );
       return true;
     } catch (e) {
-      console.warn("Sync disattivato:", e.message);
+      console.warn("Sync disattivato:", e.code, e.message);
       updateSyncBadge("err");
+      showSyncBanner(e.code, e.message);
       return false;
     }
   },
@@ -897,7 +1026,9 @@ const Sync = {
     const localDocs = state.documenti;                    // i PDF restano locali, non li tocco
     state = Object.assign(defaultState(), data.state || {});
     state.documenti = localDocs;
-    if (state.trip) syncTripRuntime();                    // allineo il viaggio (nome/date) a quello in cloud
+    syncTripRuntime();                                    // allineo il viaggio (nome/date) a quello in cloud
+    reconcileDays();                                      // VINCOLO: giorni itinerario = date del viaggio
+    if (data._rev) this.lastRev = data._rev;              // evito di ri-pubblicare lo stato appena ricevuto
     // persisto in locale lo stato remoto: così un reload mostra subito gli stessi dati
     if (STORAGE_OK) { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) { /* quota: ignoro */ } }
     this.applying = true;
@@ -917,7 +1048,7 @@ const Sync = {
       delete c.documenti; // i PDF non vanno in cloud
       this.ref.set({ state: c, _rev: this.lastRev, _updated: Date.now() })
         .then(() => updateSyncBadge("ok"))
-        .catch((e) => { console.warn("Push error:", e.message); updateSyncBadge("err"); });
+        .catch((e) => { console.warn("Push error:", e.code, e.message); updateSyncBadge("err"); showSyncBanner(e.code, e.message); });
     }, force ? 0 : 450);
   },
 };
@@ -926,7 +1057,7 @@ const Sync = {
    Event delegation
    ============================================================ */
 document.addEventListener("click", (e) => {
-  const t = e.target.closest("[data-view],[data-go],[data-trip-settings],[data-add-budget],[data-edit-budget],[data-del-budget],[data-edit-total],[data-add-volo],[data-edit-volo],[data-del-volo],[data-add-alloggio],[data-edit-alloggio],[data-del-alloggio],[data-toggle-day],[data-edit-day],[data-add-act],[data-edit-act],[data-del-act],[data-add-place],[data-edit-place],[data-del-place],[data-fav],[data-open-doc],[data-del-doc],[data-export],[data-import-btn]");
+  const t = e.target.closest("[data-view],[data-go],[data-trip-settings],[data-add-budget],[data-edit-budget],[data-del-budget],[data-edit-total],[data-add-volo],[data-edit-volo],[data-del-volo],[data-add-alloggio],[data-edit-alloggio],[data-del-alloggio],[data-toggle-day],[data-edit-day],[data-add-act],[data-edit-act],[data-del-act],[data-add-place],[data-edit-place],[data-del-place],[data-fav],[data-gmaps],[data-open-doc],[data-del-doc],[data-export],[data-import-btn]");
   if (!t) return;
   const d = t.dataset;
 
@@ -967,6 +1098,9 @@ document.addEventListener("click", (e) => {
   if (d.delPlace) { const [k, id] = d.delPlace.split("|"); return confirmDel("Eliminare questo elemento?", () => { state[k] = state[k].filter((x) => x.id !== id); commit(); toast("Eliminato"); }); }
   if (d.fav) { const [k, id] = d.fav.split("|"); const p = state[k].find((x) => x.id === id); p.preferito = !p.preferito; commit(); return; }
 
+  // Recensioni Google
+  if (d.gmaps) { const [k, id] = d.gmaps.split("|"); return fetchGoogle(k, id); }
+
   // Documenti
   if (d.openDoc) return openDoc(d.openDoc);
   if (d.delDoc) return confirmDel("Eliminare questo documento?", () => delDoc(d.delDoc));
@@ -988,6 +1122,9 @@ document.addEventListener("keydown", (e) => {
 /* sidebar mobile */
 document.getElementById("menuBtn").addEventListener("click", openSidebar);
 document.getElementById("scrim").addEventListener("click", closeSidebar);
+
+/* chiusura banner errore sync */
+document.addEventListener("click", (e) => { if (e.target.closest("[data-sync-banner-close]")) hideSyncBanner(); });
 
 /* upload: delega per dropzone (ricreata a ogni render) */
 document.addEventListener("change", (e) => {

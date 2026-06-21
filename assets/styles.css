@@ -531,6 +531,14 @@ a { color: var(--sea); }
   font-size: 12px; color: var(--muted); line-height: 1.45;
   margin: -6px 0 14px; padding-left: 2px;
 }
+.trip-duration {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 13.5px; color: var(--sea);
+  background: #eef9f8; border: 1px solid #cdeae7; border-radius: 10px;
+  padding: 10px 12px; margin: 2px 0 10px;
+}
+.trip-duration svg { flex: 0 0 auto; }
+.trip-duration b { color: var(--ink); }
 
 /* Azioni backup nella modale impostazioni */
 .field-actions {
@@ -544,3 +552,56 @@ a { color: var(--sea); }
   .stay-col:last-child { text-align: left; align-items: flex-start; }
   .stay-arrow { transform: rotate(90deg); justify-self: start; }
 }
+
+/* ============================================================
+   AGGIUNTE 2: banner errore sync + recensioni Google
+   ============================================================ */
+
+/* Banner errore sincronizzazione */
+.sync-banner {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 95;
+  display: flex; align-items: center; gap: 11px;
+  background: linear-gradient(180deg, #c0392b, #a93226); color: #fff;
+  padding: 11px 16px; font-size: 13.5px; line-height: 1.35;
+  box-shadow: 0 8px 24px rgba(0,0,0,.22);
+}
+.sync-banner[hidden] { display: none; }
+.sync-banner .sb-ico {
+  width: 24px; height: 24px; border-radius: 50%; flex: 0 0 auto;
+  background: rgba(255,255,255,.22); display: grid; place-items: center; font-weight: 800;
+}
+.sync-banner .sb-txt { flex: 1; min-width: 0; }
+.sync-banner code {
+  background: rgba(0,0,0,.28); padding: 1px 7px; border-radius: 6px;
+  font-size: 12px; font-family: ui-monospace, Menlo, monospace; white-space: nowrap;
+}
+.sync-banner .sb-x { background: transparent; border: 0; color: #fff; padding: 4px; cursor: pointer; flex: 0 0 auto; display: grid; place-items: center; }
+.sync-banner .sb-x svg { width: 16px; height: 16px; }
+
+/* Voto personale (etichetta) */
+.myrating { display: flex; align-items: center; gap: 8px; }
+.myrating .rl { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+
+/* Pulsante "Recensioni Google" */
+.btn.gbtn { align-self: flex-start; }
+.btn.gbtn svg { width: 15px; height: 15px; }
+
+/* Blocco recensioni Google */
+.gblock {
+  margin-top: 2px; padding: 12px; border: 1px solid var(--line); border-radius: 12px;
+  background: #f9fcfc; display: flex; flex-direction: column; gap: 8px;
+}
+.gblock .grating { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
+.gblock .grating > svg { width: 16px; height: 16px; color: #4285F4; flex: 0 0 auto; }
+.gblock .grating b { font-family: var(--font-display); font-size: 16px; }
+.gblock .gcount { font-size: 12.5px; color: var(--muted); }
+.gblock .grating .btn.icon { margin-left: auto; }
+.greviews { display: flex; flex-direction: column; gap: 8px; }
+.greview { border-top: 1px solid var(--line); padding-top: 8px; }
+.greview:first-child { border-top: 0; padding-top: 0; }
+.greview .grh { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: 13px; }
+.greview .grh b { color: var(--ink); }
+.greview .gtime { font-size: 11.5px; color: var(--muted); }
+.greview .grtext { font-size: 13px; color: var(--ink-soft); line-height: 1.4; margin-top: 2px; }
+.gblock .gmaps-link { font-size: 12.5px; font-weight: 600; display: inline-flex; align-items: center; gap: 5px; }
+.gblock .gattr { font-size: 10.5px; color: var(--muted); letter-spacing: .02em; }
